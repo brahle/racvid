@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
   Mat background;
   Mat frame;
 
-  for (int ii = 0; ii < config.getN(); ++ii) {
+  for (int ii = 700; ii < config.getN(); ++ii) {
     frame = imread(config.getNthName(ii).c_str());
     Mat orig = frame.clone();
 

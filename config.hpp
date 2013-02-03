@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <string>
+#include <cassert>
 
 const char *CONFIG_DIR = "D:\\data\\S3-T7-A\\video\\pets2006\\S3-T7-A\\3\\";
 const char *CONFIG_FORMAT = "S3-T7-A.%.5d.jpeg";
@@ -26,6 +27,7 @@ public:
 
   void read(const char *filename) {
     std::ifstream ifs(filename);
+    assert(ifs);
     ifs >> format >> dir >> n;
   }
 };
