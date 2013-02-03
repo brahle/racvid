@@ -32,6 +32,10 @@ public:
   }
 };
 
+const int start = 895;
+const int skip = 50;
+
+
 int main(int argc, char* argv[]) {
   Config config;
   if (argc >= 2) {
@@ -40,19 +44,22 @@ int main(int argc, char* argv[]) {
     config.read("config.cfg");
   }
 
-  namedWindow("A");
-  cvMoveWindow("A", 10, 10);
-  namedWindow("B");
-  cvMoveWindow("B", 800, 10);
+//  namedWindow("A");
+//  cvMoveWindow("A", 10, 10);
+//  namedWindow("B");
+//  cvMoveWindow("B", 800, 10);
 
   MyBackgroundSubtractor bg;
   HOGDescriptor hog;
+  hog.setSVMDetector(HOGDescriptor::getDefaultPeopleDetector());
 
   vector<Mat> frames;
   Mat background;
   Mat frame;
+  Mat foreground;
 
-  for (int ii = 700; ii < config.getN(); ++ii) {
+  for (int ii = start; ii < config.getN(); ++ii) {
+    cout << "Frame: " << ii-start+1 << "; Image: " << ii << endl;
     frame = imread(config.getNthName(ii).c_str());
     Mat orig = frame.clone();
 
@@ -65,6 +72,7 @@ int main(int argc, char* argv[]) {
 
     erode(foregroundMask, foregroundMask, Mat(), Point(-1, -1), 1);
     dilate(foregroundMask, foregroundMask, Mat(), Point(-1, -1), 1);
+    if (ii - start < skip) continue;
 
     frame = orig.clone();
     for (int i = 0; i < foregroundMask.rows; ++i)
@@ -72,16 +80,27 @@ int main(int argc, char* argv[]) {
         if (!foregroundMask.at<char>(i, j))
           frame.at<Vec3b>(i, j) = 0;
 
+    foreground = frame.clone();
+    for (int i = 0; i < foregroundMask.rows; ++i) {
+      for (int j = 0; j < foregroundMask.cols; ++j) {
+        if (foregroundMask.at<char>(i, j)) {
+          for (int k = max(i-8, 0); k < min(i+9, foregroundMask.rows); ++k) {
+            for (int l = max(j-15, 0); l < min(j+16, foregroundMask.cols); ++l) {
+              foreground.at<Vec3b>(k, l) = orig.at<Vec3b>(k, l);
+            }
+          }
+        }
+      }
+    }
+
+
     Mat img = orig.clone();
     vector<Rect> found, found_filtered;
-    //    hog.detectMultiScale(img, found, 0, Size(), Size(), 1.05, 2);
     hog.detectMultiScale(img, found, 0, Size(), Size(), 1.05, 2);
-    hog.setSVMDetector(HOGDescriptor::getDefaultPeopleDetector());
 
     size_t i, j;
     for (i=0; i<found.size(); i++) {
       Rect r = found[i];
-      //      cout << r << endl;
       for (j=0; j<found.size(); j++)
         if (j!=i && (r & found[j])==r)
           break;
@@ -90,20 +109,35 @@ int main(int argc, char* argv[]) {
     }
     for (i=0; i<found_filtered.size(); i++) {
       Rect r = found_filtered[i];
-      r.x += cvRound(r.width*0.1);
-	    r.width = cvRound(r.width*0.8);
-	    r.y += cvRound(r.height*0.06);
-	    r.height = cvRound(r.height*0.9);
 	    rectangle(img, r.tl(), r.br(), cv::Scalar(0,255,0), 2);
     }
+
+
+    hog.detectMultiScale(foreground, found, 0, Size(), Size(), 1.05, 2);
+    found_filtered.clear();
+    for (i=0; i<found.size(); i++) {
+      Rect r = found[i];
+      for (j=0; j<found.size(); j++)
+        if (j!=i && (r & found[j])==r)
+          break;
+      if (j==found.size())
+        found_filtered.push_back(r);
+    }
+    for (i=0; i<found_filtered.size(); i++) {
+      Rect r = found_filtered[i];
+	    rectangle(img, r.tl(), r.br(), cv::Scalar(255,0,0), 2);
+    }
+
     imshow("video capture", img);
+    imwrite(config.getNthOutputName(ii).c_str(), img);
+    imshow("foreground", foreground);
 
     //    imshow("A", orig);
     //    imshow("B", frame);
-    imshow("C", foregroundMask);
+    //    imshow("C", foregroundMask);
     //    imshow("back", background);
 
-    if (waitKey(30) == 27) break;
+    if (waitKey(1) == 27) break;
   }
 
   imwrite("background.jpeg", background);
