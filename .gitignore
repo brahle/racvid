@@ -16,6 +16,7 @@
 # Compiled files
 background
 hog
+detect
 
 # data files
 data

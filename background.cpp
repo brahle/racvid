@@ -26,15 +26,11 @@ using namespace cv;
 
 class MyBackgroundSubtractor : public cv::BackgroundSubtractorMOG2 {
 public:
-  MyBackgroundSubtractor() : cv::BackgroundSubtractorMOG2() {
+  MyBackgroundSubtractor() : cv::BackgroundSubtractorMOG2(3000, 4*4) {
     nShadowDetection = 0;
     bShadowDetection = true;
   }
 };
-
-const int start = 895;
-const int skip = 50;
-
 
 int main(int argc, char* argv[]) {
   Config config;
@@ -44,22 +40,18 @@ int main(int argc, char* argv[]) {
     config.read("config.cfg");
   }
 
-//  namedWindow("A");
-//  cvMoveWindow("A", 10, 10);
-//  namedWindow("B");
-//  cvMoveWindow("B", 800, 10);
+  namedWindow("A");
+  cvMoveWindow("A", 10, 10);
+  namedWindow("B");
+  cvMoveWindow("B", 800, 10);
 
   MyBackgroundSubtractor bg;
-  HOGDescriptor hog;
-  hog.setSVMDetector(HOGDescriptor::getDefaultPeopleDetector());
 
   vector<Mat> frames;
   Mat background;
   Mat frame;
-  Mat foreground;
 
-  for (int ii = start; ii < config.getN(); ++ii) {
-    cout << "Frame: " << ii-start+1 << "; Image: " << ii << endl;
+  for (int ii = 0; ii < config.getN(); ++ii) {
     frame = imread(config.getNthName(ii).c_str());
     Mat orig = frame.clone();
 
@@ -72,7 +64,6 @@ int main(int argc, char* argv[]) {
 
     erode(foregroundMask, foregroundMask, Mat(), Point(-1, -1), 1);
     dilate(foregroundMask, foregroundMask, Mat(), Point(-1, -1), 1);
-    if (ii - start < skip) continue;
 
     frame = orig.clone();
     for (int i = 0; i < foregroundMask.rows; ++i)
@@ -80,64 +71,12 @@ int main(int argc, char* argv[]) {
         if (!foregroundMask.at<char>(i, j))
           frame.at<Vec3b>(i, j) = 0;
 
-    foreground = frame.clone();
-    for (int i = 0; i < foregroundMask.rows; ++i) {
-      for (int j = 0; j < foregroundMask.cols; ++j) {
-        if (foregroundMask.at<char>(i, j)) {
-          for (int k = max(i-8, 0); k < min(i+9, foregroundMask.rows); ++k) {
-            for (int l = max(j-15, 0); l < min(j+16, foregroundMask.cols); ++l) {
-              foreground.at<Vec3b>(k, l) = orig.at<Vec3b>(k, l);
-            }
-          }
-        }
-      }
-    }
-
-
-    Mat img = orig.clone();
-    vector<Rect> found, found_filtered;
-    hog.detectMultiScale(img, found, 0, Size(), Size(), 1.05, 2);
-
-    size_t i, j;
-    for (i=0; i<found.size(); i++) {
-      Rect r = found[i];
-      for (j=0; j<found.size(); j++)
-        if (j!=i && (r & found[j])==r)
-          break;
-      if (j==found.size())
-        found_filtered.push_back(r);
-    }
-    for (i=0; i<found_filtered.size(); i++) {
-      Rect r = found_filtered[i];
-	    rectangle(img, r.tl(), r.br(), cv::Scalar(0,255,0), 2);
-    }
-
-
-    hog.detectMultiScale(foreground, found, 0, Size(), Size(), 1.05, 2);
-    found_filtered.clear();
-    for (i=0; i<found.size(); i++) {
-      Rect r = found[i];
-      for (j=0; j<found.size(); j++)
-        if (j!=i && (r & found[j])==r)
-          break;
-      if (j==found.size())
-        found_filtered.push_back(r);
-    }
-    for (i=0; i<found_filtered.size(); i++) {
-      Rect r = found_filtered[i];
-	    rectangle(img, r.tl(), r.br(), cv::Scalar(255,0,0), 2);
-    }
-
-    imshow("video capture", img);
-    imwrite(config.getNthOutputName(ii).c_str(), img);
-    imshow("foreground", foreground);
-
-    //    imshow("A", orig);
-    //    imshow("B", frame);
-    //    imshow("C", foregroundMask);
+    imshow("A", orig);
+    imshow("B", foregroundMask);
     //    imshow("back", background);
+    imwrite(config.getNthOutputName(ii).c_str(), foregroundMask);
 
-    if (waitKey(1) == 27) break;
+    if (waitKey(30) == 27) break;
   }
 
   imwrite("background.jpeg", background);

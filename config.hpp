@@ -25,7 +25,7 @@ public:
 
   std::string getNthOutputName(int n) const {
     char filename[1024];
-    sprintf(filename, (output_dir+"%d.jpg").c_str(), n);
+    sprintf(filename, (output_dir+"%05d.jpg").c_str(), n);
     return filename;
   }
 
