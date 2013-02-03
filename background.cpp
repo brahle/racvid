@@ -16,51 +16,43 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+#include "config.hpp"
+
 using namespace std;
 using namespace cv;
 
 #define TRACE(x) cout << #x " = " << x << endl
 #define FOR_EACH(it, V) for(__typeof((V).begin()) it = (V).begin(); it != (V).end(); ++it)
 
-Mat GrayToDummyRgb(Mat gray) {
-  Mat ret(gray.size(), CV_8UC3);
-  for (int i = 0; i < gray.rows; ++i)
-    for (int j = 0; j < gray.cols; ++j) {
-      Vec3b& vec = ret.at<Vec3b>(i, j);
-      uchar val = gray.at<uchar>(i, j);
-      vec[0] = val;
-      vec[1] = val;
-      vec[2] = val;
-    }
-  return ret;
-}
+class MyBackgroundSubtractor : public cv::BackgroundSubtractorMOG2 {
+public:
+  MyBackgroundSubtractor() : cv::BackgroundSubtractorMOG2() {
+    nShadowDetection = 0;
+    bShadowDetection = true;
+  }
+};
 
-int main(int argc, char* argv[])
-{
-  assert(argc > 1);
+int main(int argc, char* argv[]) {
+  Config config;
+  if (argc >= 2) {
+    config.read(argv[1]);
+  } else {
+    config.read("config.cfg");
+  }
 
   namedWindow("A");
   cvMoveWindow("A", 10, 10);
   namedWindow("B");
   cvMoveWindow("B", 800, 10);
 
-  //  namedWindow("back");
-  //  cvMoveWindow("back", 1600, 10);
-
-  BackgroundSubtractorMOG2 bg;
-  bg.nShadowDetection = 0; // pobojaj sjene u crno
-  bg.bShadowDetection = true;
+  MyBackgroundSubtractor bg;
 
   vector<Mat> frames;
   Mat background;
   Mat frame;
 
-  for (int arg = 700; arg < argc; ++arg) {
-    if (arg % 100 == 0) {
-      printf("Img %d/%d\n", arg, argc);
-    }
-
-    frame = imread(argv[arg]);
+  for (int ii = 0; ii < config.getN(); ++ii) {
+    frame = imread(config.getNthName(ii).c_str());
     Mat orig = frame.clone();
 
     bilateralFilter(orig, frame, 4, 20, 10);
@@ -82,11 +74,11 @@ int main(int argc, char* argv[])
     imshow("A", orig);
     imshow("B", frame);
     //    imshow("back", background);
-    
+
     if (waitKey(30) == 27) break;
   }
 
-  imwrite("background.jpeg", background);  
+  imwrite("background.jpeg", background);
   imwrite("frame.jpeg", frame);
   return 0;
 }
