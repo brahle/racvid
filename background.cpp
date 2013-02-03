@@ -74,18 +74,19 @@ int main(int argc, char* argv[]) {
 
     Mat img = orig.clone();
     vector<Rect> found, found_filtered;
+    //    hog.detectMultiScale(img, found, 0, Size(), Size(), 1.05, 2);
     hog.detectMultiScale(img, found, 0, Size(), Size(), 1.05, 2);
     hog.setSVMDetector(HOGDescriptor::getDefaultPeopleDetector());
 
     size_t i, j;
     for (i=0; i<found.size(); i++) {
       Rect r = found[i];
-      cout << r << endl;
-       for (j=0; j<found.size(); j++)
+      //      cout << r << endl;
+      for (j=0; j<found.size(); j++)
         if (j!=i && (r & found[j])==r)
           break;
-        if (j==found.size())
-          found_filtered.push_back(r);
+      if (j==found.size())
+        found_filtered.push_back(r);
     }
     for (i=0; i<found_filtered.size(); i++) {
       Rect r = found_filtered[i];
@@ -97,8 +98,8 @@ int main(int argc, char* argv[]) {
     }
     imshow("video capture", img);
 
-//    imshow("A", orig);
-//    imshow("B", frame);
+    //    imshow("A", orig);
+    //    imshow("B", frame);
     imshow("C", foregroundMask);
     //    imshow("back", background);
 
