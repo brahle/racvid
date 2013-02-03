@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
     imshow("A", orig);
     imshow("B", foregroundMask);
     //    imshow("back", background);
-    imwrite(config.getNthOutputName(ii).c_str(), foregroundMask);
+    imwrite(config.getNthCacheName(ii).c_str(), foregroundMask);
 
     if (waitKey(30) == 27) break;
   }

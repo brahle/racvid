@@ -188,10 +188,9 @@ void detect(Mat& frame, vector<Rect>& heads, vector<Rect>& bodies) {
   const int headY = 27;
   const int bodyX = 130;
   const int bodyY = 61;
-  const double multi = 0.80;
+  //  const double multi = 0.80;
 
   detectSize(frame, heads, bodies, headX, headY, bodyX, bodyY);
-  //  detectSize(frame, heads, bodies, multi*headX, multi*headY, multi*bodyX, multi*bodyY);
 }
 
 inline bool isRowOk(int l1, int r1, int l2, int r2) {
@@ -219,48 +218,60 @@ bool isLuggage(Rect r, const vector<Rect>& bodies) {
   return false;
 }
 
-int main(int argc, char* argv[])
-{
-  namedWindow("A");
-  cvMoveWindow("A", 10, 10);
-  namedWindow("B");
-  cvMoveWindow("B", 800, 10);
+void detectAndAnnotate(Mat orig, Mat frame) {
+  Mat tmp = frame.clone();
+  vector<Rect> peopleHead, peopleBody; detect(tmp, peopleHead, peopleBody);
+  vector<Rect> people;
+  FOR_EACH(it, peopleHead) people.push_back(*it);
+  FOR_EACH(it, peopleBody) people.push_back(*it);
+  if (people.empty()) return;
 
-  // ii = 1?
-  //  for (int ii = 1; ii < argc; ++ii) {
-  for (int ii = 800; ii < argc; ++ii) {
-    TRACE(ii);
-    Mat frame = imread(argv[ii], CV_LOAD_IMAGE_GRAYSCALE);
-    threshold(frame, frame, 100, 255, THRESH_BINARY);
-    imshow("A", frame);
+  vector<vector<Point> > contours;
+  findContours(tmp, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
 
-    Mat tmp = frame.clone();
-    vector<Rect> peopleHead, peopleBody; detect(tmp, peopleHead, peopleBody);
-    vector<Rect> people;
-    FOR_EACH(it, peopleHead) people.push_back(*it);
-    FOR_EACH(it, peopleBody) people.push_back(*it);
-    if (people.empty()) continue;
+  for (int i = 0; i < (int)people.size(); ++i) {
+    Rect r = people[i];
+    rectangle(orig, r.tl(), r.br(), cv::Scalar(0, 255, 0), 2);
+  }
+  FOR_EACH(it, contours) {
+    Rect r = boundingRect(*it);
+    if (!isLuggage(r, peopleBody)) continue;
+    rectangle(orig, r.tl(), r.br(), cv::Scalar(0, 0, 255), 2);
+  }
+}
 
-    vector<vector<Point> > contours;
-    findContours(tmp, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
-
-    cvtColor(frame, frame, CV_GRAY2BGR);
-    for (int i = 0; i < (int)people.size(); ++i) {
-      Rect r = people[i];
-      rectangle(frame, r.tl(), r.br(), cv::Scalar(0, 255, 0), 2);
-    }
-    FOR_EACH(it, contours) {
-      Rect r = boundingRect(*it);
-      if (!isLuggage(r, peopleBody)) continue;
-      rectangle(frame, r.tl(), r.br(), cv::Scalar(0, 0, 255), 2);
-    }
-    TRACE(contours.size());
-
-    imshow("A", frame);
-    imshow("B", tmp);
-    if (waitKey(50) == 27) break;
+int main(int argc, char* argv[]) {
+  Config config;
+  if (argc >= 2) {
+    config.read(argv[1]);
+  } else {
+    config.read("config.cfg");
   }
 
-  waitKey(-1);
+  namedWindow("detektor");
+  cvMoveWindow("detektor", 10, 10);
+  namedWindow("silueta");
+  cvMoveWindow("silueta", 800, 10);
+
+  for (int ii = 0; ii < config.getN(); ++ii) {
+    Mat frame = imread(config.getNthName(ii).c_str());
+    Mat foregroundMask = imread(config.getNthCacheName(ii).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+    threshold(foregroundMask, foregroundMask, 100, 255, THRESH_BINARY);
+
+    detectAndAnnotate(frame, foregroundMask);
+
+    imshow("detektor", frame);
+    imshow("silueta", foregroundMask);
+
+    int key = waitKey(30);
+    if (key == 27) break;
+    if (key == 's') {
+      static int counter = 1;
+      assert(imwrite(config.getNthOutputName(counter).c_str(), frame));
+      ++counter;
+    }
+  }
+  
+
   return 0;
 }

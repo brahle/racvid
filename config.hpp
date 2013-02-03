@@ -9,6 +9,7 @@ class Config {
   std::string format;
   std::string dir;
   std::string output_dir;
+  std::string cache_dir;
   int n;
 public:
   Config() {}
@@ -23,6 +24,12 @@ public:
     return filename;
   }
 
+  std::string getNthCacheName(int n) const {
+    char filename[1024];
+    sprintf(filename, (cache_dir+"%05d.jpg").c_str(), n);
+    return filename;
+  }
+
   std::string getNthOutputName(int n) const {
     char filename[1024];
     sprintf(filename, (output_dir+"%05d.jpg").c_str(), n);
@@ -32,7 +39,7 @@ public:
   void read(const char *filename) {
     std::ifstream ifs(filename);
     assert(ifs);
-    ifs >> format >> dir >> n >> output_dir;
+    ifs >> format >> dir >> n >> output_dir >> cache_dir;
   }
 };
 
