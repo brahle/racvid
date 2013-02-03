@@ -52,6 +52,7 @@ int main(int argc, char* argv[]) {
   Mat frame;
 
   for (int ii = 0; ii < config.getN(); ++ii) {
+    cout << "Frame: " << ii << "; Image: " << config.getNthName(ii) << endl;
     frame = imread(config.getNthName(ii).c_str());
     Mat orig = frame.clone();
 
