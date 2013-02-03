@@ -39,10 +39,10 @@ int main(int argc, char* argv[])
 {
   assert(argc > 1);
 
-  namedWindow("filter");
-  cvMoveWindow("filter", 10, 10);
-  namedWindow("fore");
-  cvMoveWindow("fore", 800, 10);
+  namedWindow("A");
+  cvMoveWindow("A", 10, 10);
+  namedWindow("B");
+  cvMoveWindow("B", 800, 10);
 
   //  namedWindow("back");
   //  cvMoveWindow("back", 1600, 10);
@@ -66,46 +66,21 @@ int main(int argc, char* argv[])
     bilateralFilter(orig, frame, 4, 20, 10);
     GaussianBlur(frame, frame, Size(9, 9), 3.0);
 
-    Mat foreground;
-    bg(frame, foreground);
+    Mat foregroundMask;
+    bg(frame, foregroundMask);
     bg.getBackgroundImage(background);
 
-    erode(foreground, foreground, Mat(), Point(-1, -1), 1);
-    dilate(foreground, foreground, Mat(), Point(-1, -1), 1);
+    erode(foregroundMask, foregroundMask, Mat(), Point(-1, -1), 1);
+    dilate(foregroundMask, foregroundMask, Mat(), Point(-1, -1), 1);
 
-    for (int i = 0; i < foreground.rows; ++i)
-      for (int j = 0; j < foreground.cols; ++j)
-        if (!foreground.at<char>(i, j))
+    frame = orig.clone();
+    for (int i = 0; i < foregroundMask.rows; ++i)
+      for (int j = 0; j < foregroundMask.cols; ++j)
+        if (!foregroundMask.at<char>(i, j))
           frame.at<Vec3b>(i, j) = 0;
 
-    // maskirani frame
-    Mat tmp = frame.clone();
-
-    cvtColor(tmp, tmp, CV_RGB2GRAY);
-    erode(tmp, tmp, Mat());
-    threshold(tmp, tmp, 1, 255, THRESH_BINARY);
-
-    //vector<vector<Point> > contours;
-    //findContours(tmp, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
-    //drawContours(frame, contours, -1, 255, 3);
-
-    // SimpleBlobDetector::Params params;
-    // params.minThreshold = 1;
-    // params.maxThreshold = 100; // ?
-    // params.filterByColor = false;
-    // params.filterByArea = false;
-    // params.filterByCircularity = false;
-    // params.filterByInertia = false;
-    // params.filterByConvexity = false;
-    // SimpleBlobDetector blobs(params); // http://docs.opencv.org/modules/features2d/doc/common_interfaces_of_feature_detectors.html#SimpleBlobDetector : public FeatureDetector
-
-    // vector<KeyPoint> keypoints;
-    // blobs.detect(frame, keypoints);
-    // cv::drawKeypoints(frame, keypoints, frame);
-
-    //    imshow("orig", orig);
-    imshow("filter", orig);
-    imshow("fore", frame);
+    imshow("A", orig);
+    imshow("B", frame);
     //    imshow("back", background);
     
     if (waitKey(30) == 27) break;
