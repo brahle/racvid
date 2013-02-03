@@ -80,16 +80,32 @@ double getAvg(Mat frame, const Rect& r) {
   return getAvg(frame, r.y, r.x, r.y+r.height, r.x+r.width);
 }
 
-void floodFill(Mat frame, int x, int y) {
+inline bool isCloseEnough(pair<int, int> p, const Rect& roi) {
+  int dist_s = 0;
+  if (p.second <= roi.x) dist_s = roi.x - p.second;
+  if (p.second >= roi.x+roi.width) dist_s = p.second - roi.x - roi.width;
+  if (dist_s > 3) return false;
+
+  int dist_r = 0;
+  if (p.first <= roi.y) dist_r = roi.y - p.first;
+  if (p.first >= roi.y+roi.height) dist_r = p.first - roi.y - roi.height;
+  if (dist_r > 100) return false;
+  return true;
+}
+
+void floodFill(Mat frame, int x, int y, Rect roi) {
   static queue<pair<int, int> > Q;
-  const static int dx[4] = {-1, 0, 1, 0};
-  const static int dy[4] = {0, 1, 0, -1};
+  const static int numDirs = 8;
+  const static int dx[numDirs] = {-2, +2, +2, -2, -1, 0, 1, 0};
+  const static int dy[numDirs] = {-2, +2, -2, +2, 0, 1, 0, -1};
   while (!Q.empty()) Q.pop();
 
   for (Q.push(make_pair(x, y)); !Q.empty(); Q.pop()) {
     pair<int, int> ex = Q.front();
+    if (!isCloseEnough(ex, roi)) break;
+
     frame.at<uchar>(ex.first, ex.second) = 0;
-    for (int dir = 0; dir < 4; ++dir) {
+    for (int dir = 0; dir < numDirs; ++dir) {
       pair<int, int> nx = ex;
       nx.first += dx[dir];
       nx.second += dy[dir];
@@ -101,18 +117,36 @@ void floodFill(Mat frame, int x, int y) {
   }
 }
 
-void detect(Mat frame, vector<Rect>& found) {
+void clearRect(Mat frame, Rect roi) {
+  for (int h = 0; h < roi.height; ++h)
+    for (int w = 0; w < roi.width; ++w) {
+      int r = roi.y + h;
+      int s = roi.x + w;
+      if (frame.at<uchar>(r, s))
+        floodFill(frame, r, s, roi);
+    }
+}
+
+void detect(Mat& frame, vector<Rect>& heads, vector<Rect>& bodies) {
   const int headX = 29;
   const int headY = 27;
   const double headThresh = 0.75;
 
   const int bodyX = 130;
-  const int bodyY = 51;
-  const double bodyThresh = 0.25;
+  const int bodyY = 61;
+  const double bodyThresh = 0.30;
+  const double lowerBodyThresh = 0.20;
 
+  Mat appended(frame.rows + bodyX, frame.cols, frame.type());
+  appended.setTo(0);
+  for (int r = 0; r < frame.rows; ++r)
+    for (int s = 0; s < frame.cols; ++s)
+      appended.at<uchar>(r, s) = frame.at<uchar>(r, s);
+  frame = appended;
   preprocess(frame);
 
-  found.clear();
+  heads.clear();
+  bodies.clear();
   for (int r = 0; r < frame.rows - headX+1; ++r)
     for (int s = 0; s < frame.cols - headY+1; ++s) {
       uchar ch = frame.at<uchar>(r, s);
@@ -122,32 +156,59 @@ void detect(Mat frame, vector<Rect>& found) {
       double avgHead = getAvg(frame, head);
 
       if (avgHead > headThresh) {
-        int bestDelta;
+        int bestDelta = -1;
         double bestAvgBody = -1e100;
 
         for (int delta = -10; delta <= 10; ++delta) {
           Rect body(s+delta, r+headX, bodyY, bodyX);
           if (!isValid(frame, body)) continue;
           double avgBody = getAvg(frame, body);
-          if (avgBody > bodyThresh && avgBody > bestAvgBody) {
+          Rect lowerBody(s+delta, r+headX+bodyX/2, bodyY, bodyX/2);
+          double avgLowerBody = getAvg(frame, lowerBody);
+          if (avgBody > bodyThresh && avgBody > bestAvgBody && avgLowerBody > lowerBodyThresh) {
             bestAvgBody = avgBody;
             bestDelta = delta;
           }
         }
 
         if (bestAvgBody > -1e100) {
-          Rect body(s+bestDelta, r+headX, bodyY, bodyX);
-          found.push_back(head);
+          heads.push_back(head);
           //          frame(head).setTo(0);
 
-          found.push_back(body);
+          Rect body(s+bestDelta, r+headX, bodyY, bodyX);
+          bodies.push_back(body);
           //          frame(body).setTo(0);
 
-          floodFill(frame, r+headX/2, s+headY/2);
+          clearRect(frame, body);
           preprocess(frame);          
         }
       }
     }
+}
+
+inline bool isRowOk(int l1, int r1, int l2, int r2) {
+  int intersect = min(r1, r2) - max(l1, l2);
+  if (intersect / double(r1-l1) < 0.5)
+    return false;
+  return true;
+}
+
+inline bool isColOk(int l1, int r1, int l2, int r2) {
+  const int thresh = 10;
+  if (l2-r1 >= 0 && r1-l2 <= thresh) return true;
+  if (l1-r2 >= 0 && l1-r2 <= thresh) return true;
+  return false;
+}
+
+bool isLuggage(Rect r, const vector<Rect>& bodies) {
+  const int sizeThresh = 30;
+  if (r.height < sizeThresh && r.width < sizeThresh) return false;
+  FOR_EACH(it, bodies) {
+    if (!isRowOk(r.y, r.y+r.height, it->y, it->y+it->height)) continue;
+    if (!isColOk(r.x, r.x+r.width, it->x, it->x+it->width)) continue;
+    return true;
+  }
+  return false;
 }
 
 int main(int argc, char* argv[])
@@ -158,19 +219,32 @@ int main(int argc, char* argv[])
   cvMoveWindow("B", 800, 10);
 
   // ii = 1?
-  for (int ii = 1400; ii < argc; ++ii) {
+  for (int ii = 1; ii < argc; ++ii) {
     Mat frame = imread(argv[ii], CV_LOAD_IMAGE_GRAYSCALE);
     threshold(frame, frame, 100, 255, THRESH_BINARY);
     imshow("A", frame);
 
     Mat tmp = frame.clone();
-    vector<Rect> found; detect(tmp, found);
+    vector<Rect> peopleHead, peopleBody; detect(tmp, peopleHead, peopleBody);
+    vector<Rect> people;
+    FOR_EACH(it, peopleHead) people.push_back(*it);
+    FOR_EACH(it, peopleBody) people.push_back(*it);
+    if (people.empty()) continue;
+
+    vector<vector<Point> > contours;
+    findContours(tmp, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
 
     cvtColor(frame, frame, CV_GRAY2BGR);
-    for (int i = 0; i < (int)found.size(); ++i) {
-      Rect r = found[i];
+    for (int i = 0; i < (int)people.size(); ++i) {
+      Rect r = people[i];
       rectangle(frame, r.tl(), r.br(), cv::Scalar(0, 255, 0), 2);
     }
+    FOR_EACH(it, contours) {
+      Rect r = boundingRect(*it);
+      if (!isLuggage(r, peopleBody)) continue;
+      rectangle(frame, r.tl(), r.br(), cv::Scalar(0, 0, 255), 2);
+    }
+    TRACE(contours.size());
 
     imshow("A", frame);
     imshow("B", tmp);
