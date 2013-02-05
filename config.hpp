@@ -11,11 +11,31 @@ class Config {
   std::string output_dir;
   std::string cache_dir;
   int n;
+  int numberOfSamples;
+  std::string samples;
+  std::string peopleResults;
+  std::string luggageResults;
 public:
   Config() {}
 
   int getN() const {
     return n;
+  }
+  
+  int getNumberOfSamples() const {
+    return numberOfSamples;
+  }
+  
+  std::string getSamples() const {
+    return samples;
+  }
+  
+  std::string getPeopleResults() const {
+    return peopleResults;
+  }
+  
+  std::string getLuggageResults() const {
+    return luggageResults;
   }
 
   std::string getNthName(int n) const {
@@ -40,6 +60,7 @@ public:
     std::ifstream ifs(filename);
     assert(ifs);
     ifs >> format >> dir >> n >> output_dir >> cache_dir;
+    ifs >> numberOfSamples >> samples >> peopleResults >> luggageResults;
   }
 };
 
